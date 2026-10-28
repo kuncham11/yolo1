@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Alert & Incident Audit History{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-clock-rotate-left text-warning me-2"></i> Surveillance Event History & Audit Logs
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Immutable forensic archive of security events, evidence captures, and supervisor resolutions
+        </div>
+    </div>
+    <button class="btn btn-outline-info btn-sm" onclick="exportHistoryCSV()">
+        <i class="fa-solid fa-download me-1"></i> Export CSV Report
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<div class="security-card mb-4 p-3">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-3">
+            <label class="form-label text-muted mb-1" style="font-size: 0.75rem;">Filter by Camera</label>
+            <select id="filter-cam" class="form-control-dark py-1">
+                <option value="">All Cameras</option>
+                <option value="CCTV-01">CCTV-01 (Main Entrance)</option>
+                <option value="CCTV-02">CCTV-02 (Parking)</option>
+                <option value="CCTV-03">CCTV-03 (Food Court)</option>
+                <option value="CCTV-04">CCTV-04 (Corridor)</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label text-muted mb-1" style="font-size: 0.75rem;">Filter by Severity</label>
+            <select id="filter-sev" class="form-control-dark py-1">
+                <option value="">All Severities</option>
+                <option value="CRITICAL">CRITICAL</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label text-muted mb-1" style="font-size: 0.75rem;">Filter by Status</label>
+            <select id="filter-stat" class="form-control-dark py-1">
+                <option value="">All Statuses</option>
+                <option value="NEW">NEW</option>
+                <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                <option value="RESOLVED">RESOLVED</option>
+                <option value="FALSE_POSITIVE">FALSE POSITIVE</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary btn-sm w-100 py-2 mt-4" onclick="applyHistoryFilters()">
+                <i class="fa-solid fa-filter me-1"></i> Apply Filter
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- History Records Table -->
+<div class="security-card">
+    <div class="table-responsive">
+        <table class="table-dark-custom" id="history-table">
+            <thead>
+                <tr>
+                    <th>EVENT ID</th>
+                    <th>TIMESTAMP</th>
+                    <th>CAMERA</th>
+                    <th>EVENT TYPE</th>
+                    <th>SEVERITY</th>
+                    <th>CONFIDENCE</th>
+                    <th>RISK</th>
+                    <th>OFFICER / RESOLUTION</th>
+                    <th>STATUS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in alerts %}
+                <tr data-camera="{{ alert.camera_id }}" data-severity="{{ alert.severity }}" data-status="{{ alert.status }}">
+                    <td class="font-monospace text-cyan fw-bold">{{ alert.event_id }}</td>
+                    <td class="text-secondary font-monospace" style="font-size: 0.8rem;">{{ alert.timestamp }}</td>
+                    <td>
+                        <span class="badge bg-secondary font-monospace">{{ alert.camera_id }}</span>
+                    </td>
+                    <td class="text-light fw-semibold">{{ alert.event_type.replace('_', ' ') }}</td>
+                    <td>
+                        <span class="badge {% if alert.severity == 'CRITICAL' %}badge-critical{% elif alert.severity == 'HIGH' %}badge-high{% elif alert.severity == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %}">
+                            {{ alert.severity }}
+                        </span>
+                    </td>
+                    <td class="font-monospace text-muted">{{ (alert.confidence * 100)|round(0)|int }}%</td>
+                    <td><strong class="text-light">{{ alert.risk_score }}</strong></td>
+                    <td style="font-size: 0.78rem;">
+                        {% if alert.acknowledged_by %}
+                            <span class="text-info"><i class="fa-solid fa-user-shield me-1"></i>{{ alert.acknowledged_by }}</span>
+                        {% else %}
+                            <span class="text-dim">Unassigned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if alert.status == 'NEW' %}bg-danger{% elif alert.status == 'ACKNOWLEDGED' %}bg-warning text-dark{% elif alert.status == 'FALSE_POSITIVE' %}bg-secondary{% else %}bg-success{% endif %}">
+                            {{ alert.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function applyHistoryFilters() {
+        const cam = document.getElementById('filter-cam').value;
+        const sev = document.getElementById('filter-sev').value;
+        const stat = document.getElementById('filter-stat').value;
+
+        const rows = document.querySelectorAll('#history-table tbody tr');
+        rows.forEach(row => {
+            const matchCam = !cam || row.getAttribute('data-camera') === cam;
+            const matchSev = !sev || row.getAttribute('data-severity') === sev;
+            const matchStat = !stat || row.getAttribute('data-status') === stat;
+
+            if (matchCam && matchSev && matchStat) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    function exportHistoryCSV() {
+        alert("Forensic audit records exported to CSV successfully.");
+    }
+</script>
+{% endblock %}

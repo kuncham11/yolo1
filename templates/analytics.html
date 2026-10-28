@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Operational Intelligence & Analytics{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-chart-line text-emerald me-2"></i> Comprehensive Security Analytics
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Longitudinal footfall statistics, peak crowd density distributions, and risk trends
+        </div>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-info active">Today</button>
+        <button class="btn btn-outline-secondary">7 Days</button>
+        <button class="btn btn-outline-secondary">30 Days</button>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- People Count & Threats Timeline -->
+    <div class="col-lg-8">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-timeline text-primary"></i> Footfall vs. Anomaly Frequency Over Time
+                </h3>
+            </div>
+            <div style="height: 280px;">
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Distribution Pie -->
+    <div class="col-lg-4">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-chart-pie text-cyan"></i> Crowd Share by Camera Node
+                </h3>
+            </div>
+            <div style="height: 280px;">
+                <canvas id="cameraShareChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Risk Index Distribution -->
+    <div class="col-lg-6">
+        <div class="security-card">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-shield-halved text-warning"></i> Risk Level Classification Breakdown
+                </h3>
+            </div>
+            <div style="height: 240px;">
+                <canvas id="riskDistChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Breakdown by Category -->
+    <div class="col-lg-6">
+        <div class="security-card">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-bell-concierge text-danger"></i> Threats Logged by Camera Sector
+                </h3>
+            </div>
+            <div style="height: 240px;">
+                <canvas id="threatsByCamChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

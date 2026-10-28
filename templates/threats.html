@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Threat Center & Incident Dispatch{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-triangle-exclamation text-danger me-2"></i> Threat Center & Incident Dispatch
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Acknowledge, triage, and resolve real-time surveillance anomalies and security threats
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="simulateThreat('GUN', 'CCTV-01')">
+            <i class="fa-solid fa-gun me-1"></i> Test Gun Threat
+        </button>
+        <button class="btn btn-outline-warning btn-sm fw-bold" onclick="simulateThreat('ACCIDENT', 'CCTV-01')">
+            <i class="fa-solid fa-truck-medical me-1"></i> Test Accident / Fall
+        </button>
+        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="simulateThreat('KILLING', 'CCTV-01')">
+            <i class="fa-solid fa-hand-fist me-1"></i> Test Violence
+        </button>
+        <button class="btn btn-outline-info btn-sm fw-bold" onclick="simulateThreat('CROWD_DISASTER', 'CCTV-01')">
+            <i class="fa-solid fa-person-burst me-1"></i> Test Crowd Risk
+        </button>
+        <button class="btn btn-danger btn-sm fw-bold" onclick="stopEmergencyAlert()">
+            <i class="fa-solid fa-circle-stop me-1"></i> Stop Alert
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Threat Matrix KPI Bar -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-card border-danger">
+            <div class="kpi-label text-danger">CRITICAL SEVERITY</div>
+            <div class="kpi-value text-danger">{{ critical_count }}</div>
+            <div class="kpi-subtext">Immediate Response Required</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card border-warning">
+            <div class="kpi-label text-warning">HIGH SEVERITY</div>
+            <div class="kpi-value text-warning">{{ high_count }}</div>
+            <div class="kpi-subtext">Restricted Zone / Breaches</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card border-info">
+            <div class="kpi-label text-info">MEDIUM SEVERITY</div>
+            <div class="kpi-value text-info">{{ medium_count }}</div>
+            <div class="kpi-subtext">Loitering & Accumulation</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card border-success">
+            <div class="kpi-label text-success">LOW / RESOLVED</div>
+            <div class="kpi-value text-success">{{ resolved_count }}</div>
+            <div class="kpi-subtext">Running / Cleared Anomalies</div>
+        </div>
+    </div>
+</div>
+
+<!-- Threats Table -->
+<div class="security-card">
+    <div class="security-card-header">
+        <h3 class="card-title-hud">
+            <i class="fa-solid fa-shield-virus text-danger"></i> Active Incident Log
+        </h3>
+        <span class="hud-badge badge-live"><span class="pulse-dot"></span> LIVE DISPATCH</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table-dark-custom">
+            <thead>
+                <tr>
+                    <th>EVENT ID</th>
+                    <th>TIMESTAMP</th>
+                    <th>CAMERA NODE</th>
+                    <th>THREAT / EVENT TYPE</th>
+                    <th>CONFIDENCE</th>
+                    <th>RISK SCORE</th>
+                    <th>STATUS</th>
+                    <th>DISPATCH ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody id="threats-table-body">
+                {% for alert in alerts %}
+                <tr id="threat-row-{{ alert.event_id }}">
+                    <td class="font-monospace text-cyan fw-bold">{{ alert.event_id }}</td>
+                    <td class="text-secondary font-monospace" style="font-size: 0.8rem;">{{ alert.timestamp }}</td>
+                    <td>
+                        <span class="badge bg-secondary font-monospace">{{ alert.camera_id }}</span>
+                        <div style="font-size: 0.72rem; color: var(--text-dim);">{{ alert.camera_name }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold {% if alert.severity == 'CRITICAL' %}text-danger{% elif alert.severity == 'HIGH' %}text-warning{% else %}text-info{% endif %}">
+                            {{ alert.event_type.replace('_', ' ') }}
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">{{ alert.description }}</div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1 bg-dark" style="height: 6px; width: 60px;">
+                                <div class="progress-bar bg-info" style="width: {{ alert.confidence * 100 }}%;"></div>
+                            </div>
+                            <span class="font-monospace" style="font-size: 0.75rem;">{{ (alert.confidence * 100)|round(0)|int }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge {% if alert.severity == 'CRITICAL' %}badge-critical{% elif alert.severity == 'HIGH' %}badge-high{% elif alert.severity == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %}">
+                            {{ alert.risk_score }}/100
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if alert.status == 'NEW' %}bg-danger{% elif alert.status == 'ACKNOWLEDGED' %}bg-warning text-dark{% elif alert.status == 'FALSE_POSITIVE' %}bg-secondary{% else %}bg-success{% endif %}" id="threat-status-{{ alert.event_id }}">
+                            {{ alert.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-danger-control" onclick="openEmergencyModalWithData({event_id: '{{ alert.event_id }}', event_type: '{{ alert.event_type }}', camera_id: '{{ alert.camera_id }}', location: '{{ alert.location }}', timestamp: '{{ alert.timestamp }}', description: '{{ alert.description }}'})" title="Contact Police, Ambulance & TV Channels">
+                                <i class="fa-solid fa-phone-volume me-1"></i> Contact
+                            </button>
+                            {% if alert.status == 'NEW' %}
+                            <button class="btn btn-warning-control" onclick="ackThreat('{{ alert.event_id }}')" title="Acknowledge Threat">
+                                <i class="fa-solid fa-check me-1"></i> ACK
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-success-control" onclick="resolveThreat('{{ alert.event_id }}')" title="Mark Resolved">
+                                <i class="fa-solid fa-circle-check me-1"></i> Resolve
+                            </button>
+                            <button class="btn btn-secondary-control" onclick="falsePositiveThreat('{{ alert.event_id }}')" title="Mark False Positive">
+                                <i class="fa-solid fa-ban"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | System Configuration{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-gear text-secondary me-2"></i> System Configuration & AI Parameters
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Fine-tune YOLOv11 confidence, ByteTrack tracking heuristics, and risk fusion weights
+        </div>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" onclick="saveSettings()">
+        <i class="fa-solid fa-floppy-disk me-1"></i> Save Configuration
+    </button>
+</div>
+
+<div class="row g-4">
+    <!-- Model & Vision Tuning -->
+    <div class="col-lg-6">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-eye text-cyan"></i> Vision & Tracking Heuristics
+                </h3>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label text-muted d-flex justify-content-between" style="font-size: 0.8rem;">
+                    <span>YOLOv11 Person Detection Confidence Threshold</span>
+                    <strong class="text-cyan" id="val-conf">0.45</strong>
+                </label>
+                <input type="range" class="form-range" min="0.1" max="0.9" step="0.05" value="0.45" oninput="document.getElementById('val-conf').innerText = this.value">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted d-flex justify-content-between" style="font-size: 0.8rem;">
+                    <span>Running Velocity Threshold (px/frame)</span>
+                    <strong class="text-cyan" id="val-vel">18.0</strong>
+                </label>
+                <input type="range" class="form-range" min="5" max="40" step="1" value="18" oninput="document.getElementById('val-vel').innerText = this.value">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted d-flex justify-content-between" style="font-size: 0.8rem;">
+                    <span>Loitering Dwell Time Threshold (Seconds)</span>
+                    <strong class="text-cyan" id="val-loiter">60s</strong>
+                </label>
+                <input type="range" class="form-range" min="15" max="180" step="5" value="60" oninput="document.getElementById('val-loiter').innerText = this.value + 's'">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted" style="font-size: 0.8rem;">Device Execution Mode</label>
+                <select class="form-control-dark">
+                    <option value="cpu">CPU (Default - Universal Compatibility)</option>
+                    <option value="cuda">CUDA / NVIDIA TensorRT (Auto-Detect)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Threat Fusion Weight Settings -->
+    <div class="col-lg-6">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-scale-balanced text-warning"></i> Threat Fusion Weights (0-100 Scale)
+                </h3>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">Weapon Confirmed</label>
+                    <input type="number" class="form-control-dark" value="50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">Possible Violence</label>
+                    <input type="number" class="form-control-dark" value="40">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">Restricted Area Breach</label>
+                    <input type="number" class="form-control-dark" value="25">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">Abnormal Movement</label>
+                    <input type="number" class="form-control-dark" value="20">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">High Crowd Density</label>
+                    <input type="number" class="form-control-dark" value="15">
+                </div>
+                <div class="col-6">
+                    <label class="form-label text-muted" style="font-size: 0.78rem;">Running Velocity</label>
+                    <input type="number" class="form-control-dark" value="10">
+                </div>
+            </div>
+
+            <div class="p-3 rounded bg-dark border border-secondary" style="font-size: 0.75rem;">
+                <div class="text-info fw-bold mb-1"><i class="fa-solid fa-database me-1"></i> Database Status</div>
+                <div class="text-secondary">MongoDB: Phase 1 Bootstrap Mock (Phase 2 integration ready)</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function saveSettings() {
+        alert("Configuration updated successfully.");
+    }
+</script>
+{% endblock %}

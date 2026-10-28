@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | 404 Not Found{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center py-5 text-center">
+    <i class="fa-solid fa-triangle-exclamation fa-4x text-danger mb-3"></i>
+    <h1 class="display-5 fw-bold text-light">404 - SECTOR NOT FOUND</h1>
+    <p class="text-muted mb-4">The requested surveillance telemetry feed or route does not exist.</p>
+    <a href="{{ url_for('dashboard_page') }}" class="btn btn-primary px-4 py-2">
+        <i class="fa-solid fa-table-cells-large me-2"></i> Return to Operations Center
+    </a>
+</div>
+{% endblock %}

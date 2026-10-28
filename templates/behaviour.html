@@ -1,0 +1,888 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Behaviour Analytics & CCTV Video Analyzer{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-person-running text-cyan me-2"></i> Behaviour Analytics & CCTV Video Analyzer
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Upload CCTV footage (MP4) to run automated tracking, loitering, running, crowd surge, and action classification
+        </div>
+    </div>
+</div>
+
+<!-- Video Upload & Analysis Suite Card -->
+<div class="security-card mb-4 border-info">
+    <div class="security-card-header">
+        <h3 class="card-title-hud text-info">
+            <i class="fa-solid fa-cloud-arrow-up text-cyan"></i> Upload CCTV Video (.mp4 / .avi / .mov) for Instant AI Behaviour Analysis
+        </h3>
+        <span class="badge bg-info text-dark font-monospace">
+            <i class="fa-solid fa-bolt me-1"></i> AUTOMATED PIPELINE
+        </span>
+    </div>
+
+    <div class="row g-4 align-items-center">
+        <div class="col-lg-7">
+            <p class="text-muted mb-3" style="font-size: 0.85rem;">
+                Select recorded CCTV surveillance footage to run the full AI perception pipeline:
+                <strong>YOLOv11 Person Detection</strong>, <strong>ByteTrack ID Association</strong>, 
+                <strong>Kinematics (Velocity/Heading)</strong>, <strong>Loitering Dwell Estimation</strong>, and <strong>Threat Triage</strong>.
+            </p>
+            <form id="cctv-upload-form" enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="file" class="form-control form-control-dark" id="video-file-input" name="video_file" accept=".mp4,.avi,.mov,.mkv" required>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold" id="btn-upload-video">
+                        <i class="fa-solid fa-play me-1"></i> Upload & Analyze
+                    </button>
+                </div>
+                <div id="upload-status" class="mt-2" style="font-size: 0.8rem;"></div>
+            </form>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="p-3 rounded bg-dark border border-secondary" style="font-size: 0.78rem;">
+                <div class="text-cyan fw-bold mb-1"><i class="fa-solid fa-circle-check text-success me-1"></i> Supported Analysis Models:</div>
+                <ul class="mb-0 text-muted ps-3">
+                    <li>Running Sprint Detection (Velocity &gt; 18 px/f)</li>
+                    <li>Loitering Dwell Time Calculation (Dwell &gt; 45s)</li>
+                    <li>Crowd Surge & Direction Coherence (&ge; 60%)</li>
+                    <li>Restricted Perimeter Geofence Breaches</li>
+                    <li>Multi-frame Weapon & Temporal Action flags</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Uploaded Video Live Analysis Viewport & Real-Time Incident Ticker -->
+<div class="row g-4 mb-4" id="analysis-viewport-section">
+    <div class="col-lg-8">
+        <div class="security-card p-0 overflow-hidden">
+            <div class="cctv-top-bar px-3 py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-danger"><i class="fa-solid fa-circle text-light me-1"></i>AI ANALYSIS STREAM</span>
+                    <span class="text-muted" id="active-cctv-label" style="font-size: 0.75rem;">
+                        {% if uploaded_camera %}{{ uploaded_camera.name }}{% else %}Live Analysis Node (CCTV-01 / CCTV-UPLOAD){% endif %}
+                    </span>
+                </div>
+                <div class="text-cyan font-monospace" style="font-size: 0.8rem;">
+                    AI PIPELINE: YOLOv11 + ByteTrack + BehaviourEngine
+                </div>
+            </div>
+
+            <!-- Viewport Display -->
+            <div class="cctv-viewport" style="height: 420px;">
+                <div class="scanlines"></div>
+                <img id="analysis-stream-img" 
+                     src="/api/cameras/{% if uploaded_camera %}CCTV-UPLOAD{% else %}CCTV-01{% endif %}/stream" 
+                     alt="Live AI Stream" 
+                     style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; z-index: 2;">
+
+                <div class="cctv-hud-overlay p-3">
+                    <div>
+                        <div class="text-warning fw-bold"><i class="fa-solid fa-crosshairs me-1"></i>BEHAVIOUR TRAJECTORY HUD</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">KINEMATICS: ACTIVE</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-info fw-bold" id="stream-camera-id">{% if uploaded_camera %}CCTV-UPLOAD{% else %}CCTV-01{% endif %}</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">PROCESSING ACTIVE</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Discovered Behaviour Ticker & Live Metrics -->
+    <div class="col-lg-4">
+        <div class="security-card h-100 d-flex flex-column justify-content-between">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-bell text-warning"></i> Real-Time Behaviour Anomaly Log
+                </h3>
+                <span class="badge bg-success" id="live-indicator"><i class="fa-solid fa-circle text-light me-1"></i> LIVE</span>
+            </div>
+
+            <!-- Live Stream Telemetry Pill -->
+            <div class="d-flex justify-content-between align-items-center p-2 rounded bg-dark border border-secondary mb-2" style="font-size: 0.78rem;">
+                <div>
+                    <span class="text-muted">ACTIVE COUNT:</span>
+                    <strong class="text-cyan font-monospace ms-1" id="ticker-live-count">0</strong>
+                </div>
+                <div>
+                    <span class="text-muted">RISK:</span>
+                    <span class="badge bg-info text-dark ms-1" id="ticker-live-risk">LOW (15/100)</span>
+                </div>
+            </div>
+
+            <div class="d-flex flex-column gap-2 overflow-auto mb-3" style="max-height: 270px;" id="behaviour-log-ticker">
+                <div class="p-2 rounded bg-dark border border-secondary" style="font-size: 0.78rem;">
+                    <div class="d-flex justify-content-between text-muted mb-1">
+                        <span class="text-cyan font-monospace">MONITORING</span>
+                        <span>Now</span>
+                    </div>
+                    <div class="text-info fw-bold">STREAM ACTIVE</div>
+                    <div class="text-dim">Analyzing human kinematics, loitering, and trajectory patterns...</div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-column gap-2 mt-2">
+                <button class="btn btn-warning text-dark fw-bold btn-sm w-100" id="btn-run-llm-vision" onclick="triggerLLMVisionScan()">
+                    <i class="fa-solid fa-brain me-1"></i> Scan Frame with LLM Vision (People Count & Risk Items)
+                </button>
+                <a href="{{ url_for('alerts.threats_view') }}" class="btn btn-outline-info btn-sm w-100">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Open Threat Center Triage
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LLM Vision Scene & Risk Forensic Inspection Card -->
+<div class="security-card mb-4 border-danger" id="llm-vision-results-card" style="display: none;">
+    <div class="security-card-header">
+        <h3 class="card-title-hud text-danger">
+            <i class="fa-solid fa-microchip-ai text-danger"></i> Multi-Modal LLM Scene & Lethal Risk Analysis
+        </h3>
+        <span class="badge bg-danger" id="llm-threat-badge">CRITICAL THREAT</span>
+    </div>
+
+    <div class="row g-4">
+        <!-- Forensic KPIs -->
+        <div class="col-md-3">
+            <div class="kpi-card text-center">
+                <div class="kpi-label">LLM PERSON COUNT</div>
+                <div class="kpi-value justify-content-center text-cyan" id="llm-person-count">0</div>
+                <div class="kpi-subtext">Spatial Visual Localization</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card text-center">
+                <div class="kpi-label">LETHAL RISK ITEMS</div>
+                <div class="kpi-value justify-content-center text-danger" id="llm-risk-items-count">0</div>
+                <div class="kpi-subtext" id="llm-risk-items-types">Guns / Knives / Weapons</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card text-center">
+                <div class="kpi-label">RISK INDEX</div>
+                <div class="kpi-value justify-content-center text-rose" id="llm-risk-score">0/100</div>
+                <div class="kpi-subtext">LLM Risk Weighting</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card text-center">
+                <div class="kpi-label">AI AUDIT STATUS</div>
+                <div class="kpi-value justify-content-center text-success" id="llm-scan-status">VERIFIED</div>
+                <div class="kpi-subtext" id="llm-timestamp">--</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forensic Assessment Narrative & Threat Breakdown Table -->
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <div class="p-3 rounded bg-dark border border-secondary h-100">
+                <div class="text-white fw-bold mb-2 font-monospace" style="font-size: 0.85rem;">
+                    <i class="fa-solid fa-file-shield text-info me-1"></i> Forensic AI Scene Summary
+                </div>
+                <p class="text-light mb-0" id="llm-forensic-text" style="font-size: 0.85rem; line-height: 1.5;">
+                    Awaiting scan...
+                </p>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="p-3 rounded bg-dark border border-secondary h-100">
+                <div class="text-white fw-bold mb-2 font-monospace" style="font-size: 0.85rem;">
+                    <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Detected Threat Objects & Actions
+                </div>
+                <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
+                    <table class="table table-dark table-sm table-striped mb-0" style="font-size: 0.78rem;">
+                        <thead>
+                            <tr class="text-muted">
+                                <th>OBJECT / ACTION</th>
+                                <th>CONFIDENCE</th>
+                                <th>LOCATION (BBOX)</th>
+                                <th>DETAILS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="llm-items-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Behaviour Categories KPI row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">LOITERING</div>
+            <div class="kpi-value justify-content-center text-warning" id="kpi-loitering">{{ loitering_count }}</div>
+            <div class="kpi-subtext">Active Loitering Events</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">RUNNING</div>
+            <div class="kpi-value justify-content-center text-info" id="kpi-running">{{ running_count }}</div>
+            <div class="kpi-subtext">High Velocity Sprinters</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">ZONE INTRUSION</div>
+            <div class="kpi-value justify-content-center text-danger" id="kpi-intrusion">{{ intrusion_count }}</div>
+            <div class="kpi-subtext">Restricted Perimeter</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">ABNORMAL MOTION</div>
+            <div class="kpi-value justify-content-center text-purple" id="kpi-abnormal">{{ abnormal_count }}</div>
+            <div class="kpi-subtext">Erratic / Counterflow</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">CROWD SURGE</div>
+            <div class="kpi-value justify-content-center text-rose" id="kpi-surge">{{ surge_count }}</div>
+            <div class="kpi-subtext">Direction Coherence &ge; 60%</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-xl-2">
+        <div class="kpi-card text-center">
+            <div class="kpi-label">POSSIBLE VIOLENCE</div>
+            <div class="kpi-value justify-content-center text-danger" id="kpi-violence">{{ violence_count }}</div>
+            <div class="kpi-subtext">Temporal Action Flags</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-chart-column text-primary"></i> 24-Hour Behaviour Anomaly Frequency
+                </h3>
+            </div>
+            <div style="height: 320px;">
+                <canvas id="behaviourBarChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-brain text-cyan"></i> AI Heuristic Weights
+                </h3>
+            </div>
+            <ul class="list-unstyled d-flex flex-column gap-3 mb-0" style="font-size: 0.8rem;">
+                <li class="p-2 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="text-danger">Weapon Persistence</strong>
+                        <div class="text-dim">4 consecutive frame agreement</div>
+                    </div>
+                    <span class="badge bg-danger">Weight: 50</span>
+                </li>
+                <li class="p-2 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="text-warning">Possible Violence</strong>
+                        <div class="text-dim">Temporal 16-frame clip model</div>
+                    </div>
+                    <span class="badge bg-warning text-dark">Weight: 40</span>
+                </li>
+                <li class="p-2 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="text-info">Restricted Zone Breach</strong>
+                        <div class="text-dim">Centroid in Polygon &gt; 3s</div>
+                    </div>
+                    <span class="badge bg-info text-dark">Weight: 25</span>
+                </li>
+                <li class="p-2 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="text-light">Crowd Surge / High Density</strong>
+                        <div class="text-dim">Velocity alignment &gt; 0.60</div>
+                    </div>
+                    <span class="badge bg-secondary">Weight: 15</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+<!-- Acoustic / MP3 Surveillance Threat Analyzer Section -->
+<div class="security-card mb-4 border-warning">
+    <div class="security-card-header">
+        <h3 class="card-title-hud text-warning">
+            <i class="fa-solid fa-microphone-lines text-warning"></i> Surveillance Audio & Acoustic Threat Analyzer (.mp3 / .wav / .aac)
+        </h3>
+        <span class="badge bg-warning text-dark font-monospace">
+            <i class="fa-solid fa-waveform-lines me-1"></i> ACOUSTIC INTELLIGENCE
+        </span>
+    </div>
+
+    <div class="row g-4 align-items-center mb-3">
+        <div class="col-lg-7">
+            <p class="text-muted mb-3" style="font-size: 0.85rem;">
+                Upload audio recordings or microphone feeds to detect explosive impulse shocks (<strong>Gunshot / Blast</strong>), 
+                human panic screams (<strong>Distress Vocalization</strong>), structural impacts (<strong>Glass Breaking</strong>), 
+                and ambient crowd noise decibel spikes.
+            </p>
+            <form id="audio-upload-form" enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="file" class="form-control form-control-dark" id="audio-file-input" name="audio_file" accept=".mp3,.wav,.aac,.m4a,.ogg,.flac" required>
+                    <button type="submit" class="btn btn-warning text-dark px-4 fw-bold" id="btn-upload-audio">
+                        <i class="fa-solid fa-wave-square me-1"></i> Analyze Audio Track
+                    </button>
+                </div>
+                <div id="audio-upload-status" class="mt-2" style="font-size: 0.8rem;"></div>
+            </form>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="p-3 rounded bg-dark border border-secondary" style="font-size: 0.78rem;">
+                <div class="text-warning fw-bold mb-1"><i class="fa-solid fa-circle-check text-success me-1"></i> Acoustic Threat Classifiers:</div>
+                <ul class="mb-0 text-muted ps-3">
+                    <li>Gunshot & Blast Shockwaves (Impulse &gt; 98 dB)</li>
+                    <li>Distress Scream & Vocal Panic (Freq Energy &gt; 84 dB)</li>
+                    <li>Glass Shatter & Structural Impact (High-freq Spike)</li>
+                    <li>Continuous Crowd Noise & Surge Decibel Profiling</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Audio Analysis Results Section (Hidden until uploaded) -->
+    <div id="audio-results-container" style="display: none;" class="pt-3 border-top border-secondary">
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="kpi-card text-center">
+                    <div class="kpi-label">PEAK DECIBEL (dB)</div>
+                    <div class="kpi-value justify-content-center text-warning" id="audio-peak-db">-- dB</div>
+                    <div class="kpi-subtext" id="audio-avg-db">Avg: -- dB</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kpi-card text-center">
+                    <div class="kpi-label">OVERALL ACOUSTIC THREAT</div>
+                    <div class="kpi-value justify-content-center" id="audio-threat-level">--</div>
+                    <div class="kpi-subtext" id="audio-risk-score">Risk Score: --</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kpi-card text-center">
+                    <div class="kpi-label">RECORDING DURATION</div>
+                    <div class="kpi-value justify-content-center text-info" id="audio-duration">-- s</div>
+                    <div class="kpi-subtext" id="audio-sample-rate">Rate: -- Hz</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kpi-card text-center d-flex flex-column justify-content-center">
+                    <div class="kpi-label mb-1">AUDIO PLAYBACK</div>
+                    <audio id="audio-player" controls class="w-100 mt-1" style="height: 36px; border-radius: 4px;"></audio>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Decibel & RMS Energy Waveform Timeline Chart -->
+            <div class="col-lg-7">
+                <div class="p-3 rounded bg-dark border border-secondary">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-white fw-bold font-monospace" style="font-size: 0.85rem;">
+                            <i class="fa-solid fa-chart-line text-warning me-1"></i> Decibel & Energy Waveform Timeline
+                        </span>
+                        <span class="badge bg-secondary font-monospace" id="audio-file-label">Track</span>
+                    </div>
+                    <div style="height: 220px;">
+                        <canvas id="audioWaveformChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detected Acoustic Threat Events Table -->
+            <div class="col-lg-5">
+                <div class="p-3 rounded bg-dark border border-secondary h-100 d-flex flex-column">
+                    <div class="text-white fw-bold font-monospace mb-2" style="font-size: 0.85rem;">
+                        <i class="fa-solid fa-list-check text-cyan me-1"></i> Detected Acoustic Threat Events
+                    </div>
+                    <div class="table-responsive flex-grow-1 overflow-auto" style="max-height: 220px;">
+                        <table class="table table-dark table-sm table-striped mb-0" style="font-size: 0.78rem;">
+                            <thead>
+                                <tr class="text-muted">
+                                    <th>TIME</th>
+                                    <th>EVENT</th>
+                                    <th>SEVERITY</th>
+                                    <th>CONF</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audio-threats-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Render Behaviour Anomaly Bar Chart
+        const ctx = document.getElementById('behaviourBarChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Loitering', 'Running', 'Restricted Entry', 'Abnormal Movement', 'Crowd Surge', 'Possible Violence'],
+                    datasets: [{
+                        label: 'Detected Anomaly Events',
+                        data: [{{ loitering_count }}, {{ running_count }}, {{ intrusion_count }}, {{ abnormal_count }}, {{ surge_count }}, {{ violence_count }}],
+                        backgroundColor: [
+                            'rgba(245, 158, 11, 0.7)',
+                            'rgba(6, 182, 212, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(139, 92, 246, 0.7)',
+                            'rgba(244, 63, 94, 0.7)',
+                            'rgba(220, 38, 38, 0.8)'
+                        ],
+                        borderColor: [
+                            '#f59e0b',
+                            '#06b6d4',
+                            '#ef4444',
+                            '#8b5cf6',
+                            '#f43f5e',
+                            '#dc2626'
+                        ],
+                        borderWidth: 1.5,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#1f293d' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#9ca3af', font: { size: 11 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Handle Video Upload Form
+        const uploadForm = document.getElementById('cctv-upload-form');
+        const uploadStatus = document.getElementById('upload-status');
+        const streamImg = document.getElementById('analysis-stream-img');
+        const cameraLabel = document.getElementById('active-cctv-label');
+        const cameraIdLabel = document.getElementById('stream-camera-id');
+
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const fileInput = document.getElementById('video-file-input');
+                if (!fileInput.files.length) {
+                    alert("Please select an MP4 video file to upload.");
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('video_file', fileInput.files[0]);
+
+                uploadStatus.innerHTML = '<span class="text-info"><i class="fa-solid fa-spinner fa-spin me-1"></i> Uploading video and launching AI Behaviour Analysis pipeline...</span>';
+
+                try {
+                    const response = await fetch('/api/upload_cctv', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const res = await response.json();
+
+                    if (res.status === 'success') {
+                        uploadStatus.innerHTML = `<span class="text-success fw-bold"><i class="fa-solid fa-circle-check me-1"></i> ${res.message}</span>`;
+                        if (cameraLabel) cameraLabel.innerText = "Uploaded: " + fileInput.files[0].name;
+                        if (cameraIdLabel) cameraIdLabel.innerText = res.camera_id;
+                        
+                        // Refresh live stream to point to newly uploaded footage
+                        if (streamImg) {
+                            streamImg.style.display = 'block';
+                            streamImg.src = res.stream_url + '?t=' + new Date().getTime();
+                        }
+                    } else {
+                        uploadStatus.innerHTML = `<span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i> ${res.message}</span>`;
+                    }
+                } catch (err) {
+                    uploadStatus.innerHTML = `<span class="text-danger">Upload failed: ${err}</span>`;
+                }
+            });
+        }
+
+        // Handle Audio Upload Form & Waveform Visualization
+        let audioChart = null;
+        const audioForm = document.getElementById('audio-upload-form');
+        const audioStatus = document.getElementById('audio-upload-status');
+        const audioResults = document.getElementById('audio-results-container');
+        const audioPlayer = document.getElementById('audio-player');
+
+        if (audioForm) {
+            audioForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const fileInput = document.getElementById('audio-file-input');
+                if (!fileInput.files.length) {
+                    alert("Please select an MP3 or audio file to analyze.");
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('audio_file', fileInput.files[0]);
+
+                audioStatus.innerHTML = '<span class="text-warning"><i class="fa-solid fa-spinner fa-spin me-1"></i> Analyzing acoustic profile, decibel levels, and threat signatures...</span>';
+
+                try {
+                    const response = await fetch('/api/upload_audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const res = await response.json();
+
+                    if (res.status === 'success') {
+                        audioStatus.innerHTML = `<span class="text-success fw-bold"><i class="fa-solid fa-circle-check me-1"></i> Analysis complete for '${res.filename}'</span>`;
+                        
+                        // Populate KPIs
+                        document.getElementById('audio-peak-db').innerText = res.peak_decibel_db + " dB";
+                        document.getElementById('audio-avg-db').innerText = "Avg: " + res.average_decibel_db + " dB";
+                        
+                        const threatBadge = document.getElementById('audio-threat-level');
+                        threatBadge.innerText = res.overall_threat_level;
+                        threatBadge.className = "kpi-value justify-content-center " + (
+                            res.overall_threat_level === 'CRITICAL' ? 'text-danger' :
+                            res.overall_threat_level === 'HIGH' ? 'text-warning' :
+                            res.overall_threat_level === 'MEDIUM' ? 'text-info' : 'text-success'
+                        );
+
+                        document.getElementById('audio-risk-score').innerText = "Risk Score: " + res.highest_risk_score;
+                        document.getElementById('audio-duration').innerText = res.duration_sec + "s";
+                        document.getElementById('audio-sample-rate').innerText = "Rate: " + res.sample_rate_hz + " Hz";
+                        document.getElementById('audio-file-label').innerText = res.filename;
+
+                        // Audio Player Source
+                        if (audioPlayer && res.audio_url) {
+                            audioPlayer.src = res.audio_url;
+                        }
+
+                        // Populate Threats Table
+                        const tbody = document.getElementById('audio-threats-tbody');
+                        tbody.innerHTML = '';
+                        if (res.detected_threats && res.detected_threats.length > 0) {
+                            res.detected_threats.forEach(t => {
+                                const row = document.createElement('tr');
+                                const sevClass = t.severity === 'CRITICAL' ? 'bg-danger' : 
+                                                 t.severity === 'HIGH' ? 'bg-warning text-dark' : 
+                                                 t.severity === 'MEDIUM' ? 'bg-info text-dark' : 'bg-secondary';
+                                row.innerHTML = `
+                                    <td class="font-monospace text-cyan">${t.timestamp}</td>
+                                    <td>
+                                        <div class="fw-bold">${t.event_type}</div>
+                                        <div class="text-muted" style="font-size:0.7rem;">${t.description}</div>
+                                    </td>
+                                    <td><span class="badge ${sevClass}">${t.severity}</span></td>
+                                    <td class="font-monospace">${(t.confidence * 100).toFixed(0)}%</td>
+                                `;
+                                tbody.appendChild(row);
+                            });
+                        }
+
+                        // Render Decibel & Energy Timeline Chart
+                        const audioChartCanvas = document.getElementById('audioWaveformChart');
+                        if (audioChartCanvas) {
+                            if (audioChart) {
+                                audioChart.destroy();
+                            }
+                            audioChart = new Chart(audioChartCanvas, {
+                                type: 'line',
+                                data: {
+                                    labels: res.timeline_labels,
+                                    datasets: [
+                                        {
+                                            label: 'Decibel Level (dB)',
+                                            data: res.decibel_levels,
+                                            borderColor: '#f59e0b',
+                                            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                            fill: true,
+                                            tension: 0.35,
+                                            yAxisID: 'y'
+                                        },
+                                        {
+                                            label: 'RMS Acoustic Energy (%)',
+                                            data: res.energy_levels,
+                                            borderColor: '#06b6d4',
+                                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                                            fill: false,
+                                            tension: 0.35,
+                                            borderDash: [4, 4],
+                                            yAxisID: 'y1'
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    interaction: {
+                                        mode: 'index',
+                                        intersect: false,
+                                    },
+                                    scales: {
+                                        y: {
+                                            type: 'linear',
+                                            display: true,
+                                            position: 'left',
+                                            min: 30,
+                                            max: 120,
+                                            grid: { color: '#1f293d' },
+                                            ticks: { color: '#f59e0b', callback: v => v + ' dB' }
+                                        },
+                                        y1: {
+                                            type: 'linear',
+                                            display: true,
+                                            position: 'right',
+                                            min: 0,
+                                            max: 100,
+                                            grid: { drawOnChartArea: false },
+                                            ticks: { color: '#06b6d4', callback: v => v + '%' }
+                                        },
+                                        x: {
+                                            grid: { color: '#1f293d' },
+                                            ticks: { color: '#9ca3af', font: { size: 10 } }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            labels: { color: '#d1d5db', boxWidth: 12 }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+
+                        audioResults.style.display = 'block';
+                    } else {
+                        audioStatus.innerHTML = `<span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i> ${res.message}</span>`;
+                    }
+                } catch (err) {
+                    audioStatus.innerHTML = `<span class="text-danger">Upload failed: ${err}</span>`;
+                }
+            });
+        }
+
+        // Real-Time Behaviour Anomaly Log & Live Metrics Auto-Updater
+        let lastEventHash = "";
+        async function fetchLiveBehaviourTelemetry() {
+            try {
+                const cameraIdEl = document.getElementById('stream-camera-id');
+                const cameraId = cameraIdEl ? cameraIdEl.innerText.trim() : 'CCTV-UPLOAD';
+
+                const response = await fetch(`/api/behaviour/live?camera_id=${encodeURIComponent(cameraId)}`);
+                if (!response.ok) return;
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // 1. Update Active People Count
+                    const liveCountEl = document.getElementById('ticker-live-count');
+                    if (liveCountEl) {
+                        liveCountEl.innerText = data.active_people_count;
+                    }
+
+                    // 2. Update Risk Badge
+                    const liveRiskEl = document.getElementById('ticker-live-risk');
+                    if (liveRiskEl) {
+                        liveRiskEl.innerText = `${data.risk_level} (${data.risk_score}/100)`;
+                        liveRiskEl.className = 'badge ms-1 ' + (
+                            data.risk_level === 'CRITICAL' ? 'bg-danger' :
+                            data.risk_level === 'HIGH' ? 'bg-warning text-dark' :
+                            data.risk_level === 'MEDIUM' ? 'bg-info text-dark' : 'bg-success text-dark'
+                        );
+                    }
+
+                    // 3. Update Category KPIs
+                    if (data.counts) {
+                        if (document.getElementById('kpi-loitering')) document.getElementById('kpi-loitering').innerText = data.counts.loitering;
+                        if (document.getElementById('kpi-running')) document.getElementById('kpi-running').innerText = data.counts.running;
+                        if (document.getElementById('kpi-intrusion')) document.getElementById('kpi-intrusion').innerText = data.counts.intrusion;
+                        if (document.getElementById('kpi-abnormal')) document.getElementById('kpi-abnormal').innerText = data.counts.abnormal;
+                        if (document.getElementById('kpi-surge')) document.getElementById('kpi-surge').innerText = data.counts.surge;
+                        if (document.getElementById('kpi-violence')) document.getElementById('kpi-violence').innerText = data.counts.violence;
+                    }
+
+                    // 4. Update Real-Time Behaviour Anomaly Log Ticker
+                    const ticker = document.getElementById('behaviour-log-ticker');
+                    if (ticker) {
+                        const eventList = data.events || [];
+                        const currentHash = JSON.stringify(eventList) + data.active_people_count;
+                        
+                        if (currentHash !== lastEventHash) {
+                            lastEventHash = currentHash;
+                            ticker.innerHTML = '';
+
+                            if (eventList.length > 0) {
+                                eventList.slice(0, 10).forEach(evt => {
+                                    const bType = evt.behaviour_type || 'ANOMALY';
+                                    const tId = evt.track_id ? `TRACK #${evt.track_id}` : 'SECTOR SENSOR';
+                                    const riskWeight = evt.risk_weight || 15;
+                                    
+                                    const colorClass = riskWeight >= 40 ? 'text-danger' : 
+                                                       riskWeight >= 25 ? 'text-warning' : 'text-info';
+                                    const badgeBg = riskWeight >= 40 ? 'bg-danger' : 
+                                                    riskWeight >= 25 ? 'bg-warning text-dark' : 'bg-info text-dark';
+
+                                    const div = document.createElement('div');
+                                    div.className = 'p-2 rounded bg-dark border border-secondary';
+                                    div.style.fontSize = '0.78rem';
+                                    div.innerHTML = `
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="text-cyan font-monospace">${tId}</span>
+                                            <span class="badge ${badgeBg}">Risk: ${riskWeight}</span>
+                                        </div>
+                                        <div class="${colorClass} fw-bold">${bType.replace(/_/g, ' ')}</div>
+                                        <div class="text-dim" style="font-size:0.75rem;">${evt.description || 'Active anomaly condition detected.'}</div>
+                                    `;
+                                    ticker.appendChild(div);
+                                });
+                            } else {
+                                ticker.innerHTML = `
+                                    <div class="p-2 rounded bg-dark border border-secondary" style="font-size: 0.78rem;">
+                                        <div class="d-flex justify-content-between text-muted mb-1">
+                                            <span class="text-cyan font-monospace">MONITORING</span>
+                                            <span>Active</span>
+                                        </div>
+                                        <div class="text-success fw-bold"><i class="fa-solid fa-circle-check me-1"></i> NORMAL FLOW</div>
+                                        <div class="text-dim">Tracking ${data.active_people_count} individuals. No abnormal velocity or perimeter breaches.</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Behaviour live telemetry polling:', err);
+            }
+        }
+
+        // Poll every 1.5 seconds for instant real-time updates
+        fetchLiveBehaviourTelemetry();
+        setInterval(fetchLiveBehaviourTelemetry, 1500);
+    });
+
+    // Trigger Multi-Modal LLM Vision Frame Analysis
+    async function triggerLLMVisionScan() {
+        const btn = document.getElementById('btn-run-llm-vision');
+        const resultsCard = document.getElementById('llm-vision-results-card');
+        const countEl = document.getElementById('llm-person-count');
+        const riskCountEl = document.getElementById('llm-risk-items-count');
+        const riskTypesEl = document.getElementById('llm-risk-items-types');
+        const riskScoreEl = document.getElementById('llm-risk-score');
+        const threatBadge = document.getElementById('llm-threat-badge');
+        const textEl = document.getElementById('llm-forensic-text');
+        const tbody = document.getElementById('llm-items-tbody');
+        const timeEl = document.getElementById('llm-timestamp');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Running LLM Multi-Modal Vision Model...';
+        }
+
+        try {
+            const cameraIdEl = document.getElementById('stream-camera-id');
+            const cameraId = cameraIdEl ? cameraIdEl.innerText.trim() : 'CCTV-UPLOAD';
+
+            const response = await fetch('/api/llm_analyze_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ camera_id: cameraId })
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                resultsCard.style.display = 'block';
+                countEl.innerText = data.person_count;
+                riskCountEl.innerText = data.risk_items ? data.risk_items.length : 0;
+                riskScoreEl.innerText = data.risk_score + '/100';
+                timeEl.innerText = data.timestamp || new Date().toLocaleTimeString();
+
+                threatBadge.innerText = data.threat_level + ' RISK';
+                threatBadge.className = 'badge ' + (
+                    data.threat_level === 'CRITICAL' ? 'bg-danger' :
+                    data.threat_level === 'HIGH' ? 'bg-warning text-dark' :
+                    data.threat_level === 'MEDIUM' ? 'bg-info text-dark' : 'bg-success'
+                );
+
+                textEl.innerText = data.forensic_summary;
+
+                if (data.risk_items && data.risk_items.length > 0) {
+                    riskTypesEl.innerText = data.risk_items.map(r => r.item_type.toUpperCase()).join(', ');
+                } else {
+                    riskTypesEl.innerText = 'No Weapons Detected';
+                }
+
+                tbody.innerHTML = '';
+                // Add risk items
+                if (data.risk_items) {
+                    data.risk_items.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong class="text-danger"><i class="fa-solid fa-gun me-1"></i> ${item.item_type.toUpperCase()}</strong></td>
+                            <td class="font-monospace text-warning">${(item.confidence * 100).toFixed(0)}%</td>
+                            <td class="font-monospace text-cyan">[${item.bbox.join(', ')}]</td>
+                            <td class="text-muted">${item.description}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+                // Add persons
+                if (data.persons) {
+                    data.persons.forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong class="text-cyan"><i class="fa-solid fa-person me-1"></i> PERSON #${p.id}</strong></td>
+                            <td class="font-monospace text-light">${(p.confidence * 100).toFixed(0)}%</td>
+                            <td class="font-monospace text-muted">[${p.bbox.join(', ')}]</td>
+                            <td class="text-info">${p.action.toUpperCase()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                // Smooth scroll to results
+                resultsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        } catch (err) {
+            alert('LLM Vision Analysis failed: ' + err);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-brain me-1"></i> Scan Frame with LLM Vision (People Count & Risk Items)';
+            }
+        }
+    }
+</script>
+{% endblock %}

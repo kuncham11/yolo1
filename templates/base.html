@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CROWDGUARD AI | Control Center{% endblock %}</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Custom Dark CCTV Theme CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h1 class="brand-title">CROWDGUARD</h1>
+                    <div class="brand-subtitle">AI Surveillance V1.0</div>
+                </div>
+            </div>
+
+            <ul class="sidebar-nav">
+                <li class="nav-section-title">Core Operations</li>
+                <li>
+                    <a href="{{ url_for('dashboard_page') }}" class="nav-link {% if request.endpoint == 'dashboard_page' %}active{% endif %}">
+                        <i class="fa-solid fa-table-cells-large"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('cameras.cameras_view') }}" class="nav-link {% if request.endpoint == 'cameras.cameras_view' %}active{% endif %}">
+                        <i class="fa-solid fa-video"></i>
+                        <span>Live Cameras</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('alerts.threats_view') }}" class="nav-link {% if request.endpoint == 'alerts.threats_view' %}active{% endif %}">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Threat Center</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('analytics.behaviour_view') }}" class="nav-link {% if request.endpoint == 'analytics.behaviour_view' %}active{% endif %}">
+                        <i class="fa-solid fa-person-running"></i>
+                        <span>Behaviour Analytics</span>
+                    </a>
+                </li>
+
+                <li class="nav-section-title">System & Records</li>
+                <li>
+                    <a href="{{ url_for('cameras.cameras_view') }}#management" class="nav-link">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Camera Management</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('alerts.history_view') }}" class="nav-link {% if request.endpoint == 'alerts.history_view' %}active{% endif %}">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Alert History</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('analytics.analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics.analytics_view' %}active{% endif %}">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('analytics.settings_view') }}" class="nav-link {% if request.endpoint == 'analytics.settings_view' %}active{% endif %}">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>System Settings</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem; font-weight: bold;">
+                            AV
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; font-weight: 600; color: #fff;">{{ session.get('name', 'Supervisor Vance') }}</div>
+                            <div style="font-size: 0.68rem; color: var(--text-dim);">Level 3 Clearance</div>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('auth.api_logout') }}" class="text-secondary hover-white" title="Logout">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <div class="main-wrapper">
+            <!-- Top Navigation Bar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <span class="hud-badge badge-live">
+                        <span class="pulse-dot"></span>
+                        SYSTEM OPERATIONAL
+                    </span>
+                    <span class="text-muted d-none d-md-inline ms-2" style="font-size: 0.8rem;">
+                        | AI Surveillance Engine (YOLOv11 + ByteTrack)
+                    </span>
+                </div>
+
+                <div class="topbar-right">
+                    <!-- Prominent CRITICAL SURVEILLANCE CRISIS ALERT Button (Shown when crisis detected) -->
+                    <div id="crisis-alert-button-container" style="display: none;">
+                        <button class="btn btn-danger btn-sm fw-bold px-3 py-1 shadow animate-pulse border border-warning d-flex align-items-center gap-2" id="btn-crisis-alert-topbar" onclick="openActiveEmergencyModal()" title="Press to open Critical Surveillance Crisis Alert details">
+                            <i class="fa-solid fa-triangle-exclamation fa-beat text-warning"></i>
+                            <span>CRITICAL SURVEILLANCE CRISIS ALERT</span>
+                            <span class="badge bg-black text-warning font-monospace" id="topbar-crisis-threat-type">ALERT</span>
+                        </button>
+                    </div>
+
+                    <!-- Global Emergency STOP ALARM Button -->
+                    <div id="global-stop-alert-container" style="display: none;">
+                        <button class="btn btn-outline-danger btn-sm fw-bold px-2 py-1 shadow" id="btn-global-stop-alert" onclick="stopEmergencyAlert()" title="Immediately stop and silence the active emergency alert">
+                            <i class="fa-solid fa-circle-stop me-1"></i> STOP
+                        </button>
+                    </div>
+
+                    <div class="clock-display" id="live-clock">--:--:-- UTC</div>
+                    <div class="position-relative">
+                        <button class="btn btn-dark btn-sm rounded-circle p-2 border-secondary" id="notif-btn">
+                            <i class="fa-regular fa-bell text-light"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-dark rounded-circle"></span>
+                        </button>
+                    </div>
+                    <a href="{{ url_for('auth.api_logout') }}" class="btn btn-outline-danger btn-sm px-3">
+                        <i class="fa-solid fa-power-off me-1"></i> Logout
+                    </a>
+                </div>
+            </header>
+
+            <!-- Page Body Content -->
+            <main class="content-body">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Multi-Agency Emergency Dispatch Modal -->
+    <div class="modal fade" id="emergencyDispatchModal" tabindex="-1" aria-labelledby="emergencyModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content bg-dark text-light border border-danger shadow-lg" style="box-shadow: 0 0 35px rgba(239, 68, 68, 0.45) !important;">
+                <div class="modal-header bg-danger text-white py-3 border-0">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation fa-beat fa-xl"></i>
+                        <div>
+                            <h5 class="modal-title fw-bold m-0" id="emergencyModalLabel">
+                                🚨 CRITICAL SURVEILLANCE CRISIS ALERT
+                            </h5>
+                            <div style="font-size: 0.75rem; opacity: 0.9;">
+                                IMMEDIATE MULTI-AGENCY CONTACT & PUBLIC SAFETY BROADCAST PROTOCOL
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4" style="background-color: #0b0f19;">
+                    <!-- Threat Banner & Metadata -->
+                    <div class="p-3 mb-4 rounded border border-danger" style="background: rgba(239, 68, 68, 0.08);">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <span class="badge bg-danger fs-6 fw-bold text-uppercase" id="modal-emg-type">
+                                WEAPON / ACCIDENT DETECTED
+                            </span>
+                            <span class="badge bg-secondary font-monospace" id="modal-emg-id">
+                                EMG-00000
+                            </span>
+                        </div>
+                        <div class="row g-2 text-secondary mb-2" style="font-size: 0.85rem;">
+                            <div class="col-md-6">
+                                <i class="fa-solid fa-video text-info me-1"></i>
+                                <span class="text-light fw-bold">Camera:</span> <span id="modal-emg-camera">CCTV-01</span>
+                            </div>
+                            <div class="col-md-6">
+                                <i class="fa-solid fa-clock text-warning me-1"></i>
+                                <span class="text-light fw-bold">Timestamp:</span> <span id="modal-emg-time">--:--:--</span>
+                            </div>
+                        </div>
+                        <div class="text-light fw-semibold" id="modal-emg-desc" style="font-size: 0.92rem;">
+                            Armed subject detected carrying active weapon in surveillance zone.
+                        </div>
+                    </div>
+
+                    <!-- 3 Emergency Agency Cards Grid -->
+                    <div class="row g-3 mb-4">
+                        <!-- Card 1: POLICE -->
+                        <div class="col-md-4">
+                            <div class="card h-100 bg-black border-danger text-light p-3 position-relative">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="rounded-circle p-2 bg-danger text-white">
+                                        <i class="fa-solid fa-shield-halved fa-lg"></i>
+                                    </div>
+                                    <span class="badge bg-danger font-monospace px-2 py-1" id="dispatch-status-POLICE">
+                                        <i class="fa-solid fa-clock me-1"></i> PENDING
+                                    </span>
+                                </div>
+                                <h6 class="fw-bold text-danger mb-1">POLICE DEPARTMENT</h6>
+                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">
+                                    Emergency Dial: <strong>911 / 100</strong><br>
+                                    Armed Interception & Law Enforcement
+                                </div>
+                                <div class="mt-auto">
+                                    <button class="btn btn-danger btn-sm w-100 fw-bold" id="btn-dispatch-POLICE" onclick="dispatchEmergency('POLICE')">
+                                        <i class="fa-solid fa-phone me-1"></i> Dispatch Police
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: AMBULANCE -->
+                        <div class="col-md-4">
+                            <div class="card h-100 bg-black border-warning text-light p-3 position-relative">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="rounded-circle p-2 bg-warning text-dark">
+                                        <i class="fa-solid fa-truck-medical fa-lg"></i>
+                                    </div>
+                                    <span class="badge bg-danger font-monospace px-2 py-1" id="dispatch-status-AMBULANCE">
+                                        <i class="fa-solid fa-clock me-1"></i> PENDING
+                                    </span>
+                                </div>
+                                <h6 class="fw-bold text-warning mb-1">AMBULANCE / EMS</h6>
+                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">
+                                    Emergency Dial: <strong>108 / 911</strong><br>
+                                    Casualty Triage, Trauma Unit & Paramedics
+                                </div>
+                                <div class="mt-auto">
+                                    <button class="btn btn-warning btn-sm w-100 fw-bold" id="btn-dispatch-AMBULANCE" onclick="dispatchEmergency('AMBULANCE')">
+                                        <i class="fa-solid fa-phone me-1"></i> Dispatch Ambulance
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: TV CHANNEL / EAS -->
+                        <div class="col-md-4">
+                            <div class="card h-100 bg-black border-info text-light p-3 position-relative">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="rounded-circle p-2 bg-info text-dark">
+                                        <i class="fa-solid fa-tower-broadcast fa-lg"></i>
+                                    </div>
+                                    <span class="badge bg-danger font-monospace px-2 py-1" id="dispatch-status-TV_CHANNEL">
+                                        <i class="fa-solid fa-clock me-1"></i> PENDING
+                                    </span>
+                                </div>
+                                <h6 class="fw-bold text-info mb-1">TV CHANNELS & MEDIA</h6>
+                                <div class="text-secondary mb-2" style="font-size: 0.75rem;">
+                                    Emergency EAS Broadcast<br>
+                                    Live News Crawl & Public Evacuation Alert
+                                </div>
+                                <div class="mt-auto">
+                                    <button class="btn btn-info btn-sm w-100 fw-bold" id="btn-dispatch-TV_CHANNEL" onclick="dispatchEmergency('TV_CHANNEL')">
+                                        <i class="fa-solid fa-tower-broadcast me-1"></i> Broadcast to TV
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Instant Multi-Agency Dispatch Action -->
+                    <div class="p-3 bg-dark rounded border border-secondary d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="text-secondary" style="font-size: 0.8rem;">
+                            <i class="fa-solid fa-circle-info text-cyan me-1"></i>
+                            Execute combined emergency transmission to Police, Ambulance & TV Broadcasters.
+                        </div>
+                        <button class="btn btn-danger fw-bold px-3 py-2" onclick="dispatchEmergency('ALL')">
+                            <i class="fa-solid fa-bullhorn me-1"></i> DISPATCH ALL (POLICE + EMS + TV)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary py-2 d-flex justify-content-between align-items-center" style="background-color: #0b0f19;">
+                    <button type="button" class="btn btn-danger fw-bold px-4 py-2" id="btn-modal-stop-alarm" onclick="stopEmergencyAlert()">
+                        <i class="fa-solid fa-circle-stop me-1"></i> STOP ALARM & DISMISS
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="stopEmergencyAlert()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Real-time Clock Script -->
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0] + ' IST';
+            const dateStr = now.toISOString().slice(0, 10);
+            const clockEl = document.getElementById('live-clock');
+            if (clockEl) {
+                clockEl.innerText = `${dateStr} | ${timeStr}`;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    
+    <!-- Universal Alerts & Emergency Dispatch Engine -->
+    <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Camera Feed {{ camera.camera_id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-secondary font-monospace">{{ camera.camera_id }}</span>
+            <h2 class="h4 text-white fw-bold m-0">{{ camera.name }}</h2>
+            <span class="badge badge-live ms-2">{{ camera.status }}</span>
+        </div>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            <i class="fa-solid fa-location-dot me-1"></i>{{ camera.location }} | Source: {{ camera.source_type }} ({{ camera.resolution }})
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-info btn-sm" onclick="activateLaptopWebcam('{{ camera.camera_id }}', 0)">
+            <i class="fa-solid fa-laptop me-1"></i> Connect Laptop Camera (0)
+        </button>
+        <a href="{{ url_for('cameras.cameras_view') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to Grid
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Main Large Camera Video Feed Viewport -->
+    <div class="col-lg-8">
+        <div class="security-card p-0 overflow-hidden">
+            <div class="cctv-top-bar px-3 py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-danger"><i class="fa-solid fa-circle text-light me-1"></i>LIVE STREAM</span>
+                    <span class="text-muted" style="font-size: 0.75rem;">AI INFERENCE: YOLOv11 + ByteTrack Active</span>
+                </div>
+                <div class="text-cyan font-monospace" style="font-size: 0.8rem;" id="detail-fps-label">
+                    FPS: {{ camera.fps_limit }} | LATENCY: 18ms
+                </div>
+            </div>
+
+            <!-- Large Viewport Display -->
+            <div class="cctv-viewport" style="height: 480px;">
+                <div class="scanlines"></div>
+                <img id="detail-stream-img"
+                     src="{{ url_for('cameras.camera_video_stream', camera_id=camera.camera_id) }}" 
+                     alt="{{ camera.name }}" 
+                     style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; z-index: 2;"
+                     onerror="this.style.display='none';">
+
+                <!-- HUD Overlay Controls -->
+                <div class="cctv-hud-overlay p-3">
+                    <div>
+                        <div class="text-warning fw-bold"><i class="fa-solid fa-crosshairs me-1"></i>AI TRACKING ENGINE</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">CONFIDENCE THRESHOLD: 0.45</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-info fw-bold">{{ camera.camera_id }}</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">LIVE SURVEILLANCE FEED</div>
+                    </div>
+                </div>
+
+                <!-- AI Tracking Boxes Visualization for this feed -->
+                <div class="mock-feed-layer">
+                    {% if camera.camera_id == 'CCTV-03' %}
+                        <div class="ai-box threat" style="top: 25%; left: 35%; width: 130px; height: 210px; font-size: 0.8rem;">
+                            <strong>PERSON 1 OF 2</strong><br>
+                            <span class="badge bg-danger mt-1">WEAPON: GUN (94%)</span><br>
+                            <span class="badge bg-warning text-dark mt-1"><i class="fa-solid fa-person-walking me-1"></i>MOTION: 4.2 px/f</span><br>
+                            Zone: Main Dining
+                        </div>
+                        <div class="ai-box" style="top: 35%; left: 65%; width: 120px; height: 180px; font-size: 0.75rem;">
+                            <strong>PERSON 2 OF 2</strong><br>
+                            <span class="badge bg-secondary mt-1"><i class="fa-solid fa-person me-1"></i>MOTION: IDLE</span><br>
+                            Confidence: 91%
+                        </div>
+                    {% elif camera.camera_id == 'CCTV-04' %}
+                        <div style="position: absolute; top: 15%; right: 10%; width: 220px; height: 300px; border: 2px dashed #ef4444; background: rgba(239, 68, 68, 0.15); display: flex; align-items: flex-end; justify-content: center; padding: 6px; font-size: 0.8rem; color: #f87171; font-weight: bold;">
+                            <i class="fa-solid fa-ban me-1"></i> RESTRICTED ZONE (VAULT AREA)
+                        </div>
+                        <div class="ai-box threat" style="top: 35%; right: 18%; width: 125px; height: 200px; font-size: 0.8rem;">
+                            <strong>PERSON 1 OF 1</strong><br>
+                            <span class="badge bg-danger mt-1">ZONE INTRUSION</span><br>
+                            <span class="badge bg-warning text-dark mt-1"><i class="fa-solid fa-person-running me-1"></i>MOTION: RUNNING</span><br>
+                            Inside Zone: 12s
+                        </div>
+                    {% elif camera.camera_id == 'CCTV-02' %}
+                        <div class="ai-box warning" style="top: 30%; left: 45%; width: 125px; height: 210px; font-size: 0.8rem;">
+                            <strong>PERSON 1 OF 1</strong><br>
+                            <span class="badge bg-warning text-dark mt-1">LOITERING DETECTED</span><br>
+                            <span class="badge bg-info mt-1"><i class="fa-solid fa-person me-1"></i>MOTION: MINIMAL</span><br>
+                            Duration: 4m 12s
+                        </div>
+                    {% else %}
+                        <div class="ai-box" style="top: 30%; left: 30%; width: 125px; height: 200px; font-size: 0.8rem;">
+                            <strong>PERSON 1 OF 2</strong><br>
+                            <span class="badge bg-success mt-1"><i class="fa-solid fa-person-walking me-1"></i>MOTION DETECTED</span><br>
+                            Conf: 94% | Dir: East
+                        </div>
+                        <div class="ai-box" style="top: 35%; left: 55%; width: 125px; height: 180px; font-size: 0.8rem;">
+                            <strong>PERSON 2 OF 2</strong><br>
+                            <span class="badge bg-success mt-1"><i class="fa-solid fa-person-walking me-1"></i>MOTION DETECTED</span><br>
+                            Conf: 91% | Dir: North
+                        </div>
+                    {% endif %}
+                    
+                    <div class="text-center text-secondary opacity-25">
+                        <i class="fa-solid fa-video fa-5x mb-3"></i>
+                        <div style="font-size: 1rem; letter-spacing: 2px;">LIVE RTSP / WEBCAM PIPELINE ACTIVE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Viewport Overlay Toggles -->
+            <div class="p-3 bg-dark d-flex flex-wrap align-items-center justify-content-between gap-3 border-top border-secondary">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="toggle-boxes" checked>
+                        <label class="form-check-label text-muted" style="font-size: 0.8rem;" for="toggle-boxes">Bounding Boxes</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="toggle-tracks" checked>
+                        <label class="form-check-label text-muted" style="font-size: 0.8rem;" for="toggle-tracks">Person Count & Motion Trajectory</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="toggle-zones" checked>
+                        <label class="form-check-label text-muted" style="font-size: 0.8rem;" for="toggle-zones">Restricted Zones</label>
+                    </div>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-info" onclick="reloadDetailStream()"><i class="fa-solid fa-arrows-rotate me-1"></i> Refresh Stream</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Side Telemetry & Real-Time Incident Panel -->
+    <div class="col-lg-4">
+        <!-- Live Metrics Card -->
+        <div class="security-card mb-4">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-gauge-high text-info"></i> Node Telemetry
+                </h3>
+                <span class="badge bg-secondary font-monospace">{{ camera.camera_id }}</span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span class="text-muted" style="font-size: 0.85rem;">Real-Time Person Count</span>
+                <span class="fs-4 fw-bold text-cyan font-monospace" id="detail-people-count">{{ camera.people_count }} Persons</span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span class="text-muted" style="font-size: 0.85rem;">Motion Detection</span>
+                <span class="badge bg-success font-monospace fs-6" id="detail-motion-badge">
+                    <i class="fa-solid fa-person-walking me-1"></i>MOTION DETECTED
+                </span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span class="text-muted" style="font-size: 0.85rem;">Crowd Density Level</span>
+                <span class="badge {% if camera.density == 'HIGH' %}badge-critical{% elif camera.density == 'MODERATE' %}badge-medium{% else %}badge-low{% endif %} fs-6" id="detail-density-badge">
+                    {{ camera.density }}
+                </span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span class="text-muted" style="font-size: 0.85rem;">Calculated Risk Index</span>
+                <span class="badge {% if camera.risk_level == 'CRITICAL' %}badge-critical{% elif camera.risk_level == 'HIGH' %}badge-high{% elif camera.risk_level == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %} fs-6" id="detail-risk-badge">
+                    {{ camera.risk_level }} ({{ camera.risk_score }}/100)
+                </span>
+            </div>
+
+            <div class="p-2 rounded border border-secondary" style="font-size: 0.75rem;">
+                <div class="text-muted mb-1">Latest Flagged Anomaly:</div>
+                <div class="text-warning fw-bold" id="detail-latest-event"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ camera.latest_event }}</div>
+            </div>
+        </div>
+
+        <!-- Recent Node Events -->
+        <div class="security-card">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-clock-rotate-left text-warning"></i> Real-Time Behaviour Anomaly Log
+                </h3>
+            </div>
+            <div class="d-flex flex-column gap-2" style="font-size: 0.78rem;" id="detail-recent-events-container">
+                <div class="p-2 rounded bg-dark border border-secondary">
+                    <div class="d-flex justify-content-between text-muted mb-1">
+                        <span>LIVE</span>
+                        <span>Now</span>
+                    </div>
+                    <div class="text-info fw-bold">Monitoring Stream</div>
+                    <div class="text-dim">Analyzing human kinematics, running, and trajectory patterns...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const currentCameraId = "{{ camera.camera_id }}";
+
+    async function activateLaptopWebcam(camId, devIdx) {
+        try {
+            const res = await fetch('/api/cameras/laptop/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ camera_id: camId, device_index: devIdx })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                reloadDetailStream();
+            } else {
+                alert("Notice: " + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function reloadDetailStream() {
+        const img = document.getElementById('detail-stream-img');
+        if (img) {
+            img.style.display = 'block';
+            img.src = `/api/cameras/${currentCameraId}/stream?t=` + Date.now();
+        }
+    }
+
+    // Poll live behaviour telemetry
+    setInterval(async () => {
+        try {
+            const res = await fetch(`/api/cameras/${encodeURIComponent(currentCameraId)}/behaviour`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status === 'success') {
+                const countEl = document.getElementById('detail-people-count');
+                if (countEl) countEl.innerText = `${data.people_count} Persons`;
+
+                const motionBadge = document.getElementById('detail-motion-badge');
+                if (motionBadge) {
+                    if (data.motion_count > 0 || data.motion_status === 'MOTION DETECTED') {
+                        motionBadge.className = 'badge bg-success font-monospace fs-6';
+                        motionBadge.innerHTML = `<i class="fa-solid fa-person-walking me-1"></i>MOTION DETECTED (${data.motion_count || 1} Moving)`;
+                    } else {
+                        motionBadge.className = 'badge bg-secondary font-monospace fs-6';
+                        motionBadge.innerHTML = `<i class="fa-solid fa-person me-1"></i>STATIONARY (No Motion)`;
+                    }
+                }
+
+                const fpsLabel = document.getElementById('detail-fps-label');
+                if (fpsLabel && data.fps) {
+                    fpsLabel.innerText = `FPS: ${data.fps} | LATENCY: 16ms`;
+                }
+
+                const riskBadge = document.getElementById('detail-risk-badge');
+                if (riskBadge) {
+                    riskBadge.innerText = `${data.risk_level} (${data.risk_score}/100)`;
+                }
+
+                const densityBadge = document.getElementById('detail-density-badge');
+                if (densityBadge) {
+                    densityBadge.innerText = data.density;
+                }
+
+                if (data.events && data.events.length > 0) {
+                    const latest = data.events[0];
+                    const latestEl = document.getElementById('detail-latest-event');
+                    if (latestEl) {
+                        const cleanDesc = (latest.description || latest.behaviour_type).replace(/Track\s*#\d+/gi, 'Identified Person');
+                        latestEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i>${cleanDesc}`;
+                    }
+
+                    const container = document.getElementById('detail-recent-events-container');
+                    if (container) {
+                        container.innerHTML = '';
+                        data.events.slice(0, 5).forEach(e => {
+                            const d = document.createElement('div');
+                            d.className = 'p-2 rounded bg-dark border border-secondary';
+                            const cleanText = (e.description || 'Movement event').replace(/Track\s*#\d+/gi, 'Identified Person');
+                            d.innerHTML = `
+                                <div class="d-flex justify-content-between text-muted mb-1">
+                                    <span class="badge bg-warning text-dark">${(e.behaviour_type || 'ANOMALY').replace(/_/g, ' ')}</span>
+                                    <span class="text-cyan font-monospace">COUNT: ${data.people_count}</span>
+                                </div>
+                                <div class="text-light fw-bold">${cleanText}</div>
+                            `;
+                            container.appendChild(d);
+                        });
+                    }
+                }
+            }
+        } catch (e) {}
+    }, 1200);
+</script>
+{% endblock %}
+

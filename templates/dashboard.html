@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}CROWDGUARD AI | Real-Time Operations Control Room{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h2 class="h4 text-white fw-bold mb-1">
+            <i class="fa-solid fa-radar text-info me-2"></i> Real-Time Surveillance Matrix
+        </h2>
+        <div class="text-secondary" style="font-size: 0.85rem;">
+            Multi-Camera Automated Threat Detection, Crowd Density, and Behaviour Analysis
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="simulateThreat('GUN', 'CCTV-01')" title="Simulate firearm/gun weapon detection and Police dispatch">
+            <i class="fa-solid fa-gun me-1"></i> Test Gun
+        </button>
+        <button class="btn btn-outline-warning btn-sm fw-bold" onclick="simulateThreat('ACCIDENT', 'CCTV-01')" title="Simulate accident/fall and Ambulance dispatch">
+            <i class="fa-solid fa-truck-medical me-1"></i> Test Accident
+        </button>
+        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="simulateThreat('KILLING', 'CCTV-01')" title="Simulate violence/killing threat">
+            <i class="fa-solid fa-hand-fist me-1"></i> Test Violence
+        </button>
+        <button class="btn btn-outline-info btn-sm fw-bold" onclick="simulateThreat('CROWD_DISASTER', 'CCTV-01')" title="Simulate crowd stampede risk and TV broadcast">
+            <i class="fa-solid fa-person-burst me-1"></i> Test Crowd Risk
+        </button>
+        <button class="btn btn-danger btn-sm fw-bold" onclick="stopEmergencyAlert()" title="Stop alarm and clear active emergency state">
+            <i class="fa-solid fa-circle-stop me-1"></i> Stop Alert
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="btn-refresh-dashboard">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Refresh
+        </button>
+        <a href="{{ url_for('cameras.cameras_view') }}" class="btn btn-primary btn-sm px-3">
+            <i class="fa-solid fa-expand me-1"></i> Full Grid View
+        </a>
+    </div>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-label">CAMERAS ONLINE</div>
+        <div class="kpi-value text-emerald">
+            <span id="kpi-cameras-online">{{ online_count }}/{{ total_cameras }}</span>
+            <span class="badge badge-low fs-6 ms-2">{% if total_cameras > 0 %}{{ ((online_count / total_cameras) * 100)|int }}% UP{% else %}0%{% endif %}</span>
+        </div>
+        <i class="fa-solid fa-video kpi-icon text-success"></i>
+        <div class="kpi-subtext">{{ online_count }} Active Processing Nodes</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-label">TOTAL PEOPLE DETECTED</div>
+        <div class="kpi-value text-info">
+            <span id="kpi-people-count">{{ total_people }}</span>
+            <span class="fs-6 text-muted fw-normal">Tracks</span>
+        </div>
+        <i class="fa-solid fa-users-viewfinder kpi-icon text-info"></i>
+        <div class="kpi-subtext">Sum Across Active Camera Nodes</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-label">ACTIVE THREATS</div>
+        <div class="kpi-value text-danger">
+            <span id="kpi-threats-count">{{ active_threats }}</span>
+            <span class="badge {% if active_threats > 0 %}badge-critical{% else %}badge-low{% endif %} fs-6 ms-2">
+                {% if active_threats > 0 %}ACTION REQUIRED{% else %}CLEARED{% endif %}
+            </span>
+        </div>
+        <i class="fa-solid fa-triangle-exclamation kpi-icon text-danger"></i>
+        <div class="kpi-subtext">Pending / Unresolved Incident Alerts</div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-label">HIGHEST RISK INDEX</div>
+        <div class="kpi-value text-rose">
+            <span id="kpi-risk-score">{{ highest_score }}</span><span class="fs-6 text-muted">/100</span>
+            <span class="badge {% if highest_level == 'CRITICAL' %}badge-critical{% elif highest_level == 'HIGH' %}badge-high{% elif highest_level == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %} fs-6 ms-2" id="kpi-risk-level">{{ highest_level }}</span>
+        </div>
+        <i class="fa-solid fa-shield-virus kpi-icon text-rose"></i>
+        <div class="kpi-subtext">Sector: {{ highest_cam_label }}</div>
+    </div>
+</div>
+
+<!-- 2x2 CCTV Live Feed Grid -->
+<div class="security-card mb-4">
+    <div class="security-card-header">
+        <h3 class="card-title-hud">
+            <i class="fa-solid fa-network-wired text-primary"></i> Live CCTV 2x2 Surveillance Feeds
+        </h3>
+        <span class="hud-badge {% if cameras|length > 0 %}badge-live{% else %}badge-low{% endif %}">
+            <span class="pulse-dot"></span> {{ cameras|length }} STREAMS CONFIGURED
+        </span>
+    </div>
+
+    <div class="cctv-grid">
+        {% if cameras|length == 0 %}
+        <div class="p-5 text-center text-secondary w-100 bg-dark rounded border border-secondary" style="grid-column: 1 / -1;">
+            <i class="fa-solid fa-video-slash fa-3x mb-3 text-muted"></i>
+            <h5 class="text-white">No CCTV Cameras Registered</h5>
+            <p class="text-muted small">The interface remains in standby until you connect your laptop webcam or register a camera node.</p>
+            <a href="{{ url_for('cameras.cameras_view') }}" class="btn btn-outline-info btn-sm">
+                <i class="fa-solid fa-video me-1"></i> Open Camera Grid & Connect Webcam
+            </a>
+        </div>
+        {% endif %}
+
+        {% for cam in cameras %}
+        <div class="cctv-feed-card" id="card-{{ cam.camera_id }}">
+            <div class="cctv-top-bar">
+                <div>
+                    <div class="cctv-name">
+                        <span class="badge bg-secondary text-light font-monospace">{{ cam.camera_id }}</span>
+                        <span>{{ cam.name }}</span>
+                    </div>
+                    <div class="cctv-location"><i class="fa-solid fa-location-dot me-1"></i>{{ cam.location }}</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge badge-live">{{ cam.status }}</span>
+                    <a href="{{ url_for('cameras.camera_detail_view', camera_id=cam.camera_id) }}" class="btn btn-dark btn-sm p-1 px-2 border-secondary" title="Expand Feed">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center text-info" style="font-size: 0.75rem;"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Live CCTV Viewport -->
+            <div class="cctv-viewport" style="background: #000;">
+                <div class="scanlines"></div>
+                <img src="{{ url_for('cameras.camera_video_stream', camera_id=cam.camera_id) }}" 
+                     alt="{{ cam.name }}" 
+                     style="width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; z-index: 2;"
+                     onerror="this.style.display='none';">
+
+                <!-- HUD Details -->
+                <div class="cctv-hud-overlay">
+                    <div>
+                        <span class="text-danger fw-bold"><i class="fa-solid fa-circle text-danger me-1"></i>REC</span> | 
+                        <span>FPS: {{ cam.fps_limit }}</span>
+                    </div>
+                    <div class="font-monospace text-cyan">{{ cam.camera_id }} // AI-NODE-0{{ loop.index }}</div>
+                </div>
+            </div>
+
+            <!-- Footer Stats -->
+            <div class="cctv-footer-stats">
+                <div class="stat-pill">
+                    <i class="fa-solid fa-user-group text-info"></i>
+                    <span>People: <strong class="text-light">{{ cam.people_count }}</strong></span>
+                </div>
+                <div class="stat-pill">
+                    <i class="fa-solid fa-chart-simple text-secondary"></i>
+                    <span>Density: 
+                        <strong class="{% if cam.density == 'HIGH' %}text-danger{% elif cam.density == 'MODERATE' %}text-warning{% else %}text-success{% endif %}">
+                            {{ cam.density }}
+                        </strong>
+                    </span>
+                </div>
+                <div>
+                    <span class="badge {% if cam.risk_level == 'CRITICAL' %}badge-critical{% elif cam.risk_level == 'HIGH' %}badge-high{% elif cam.risk_level == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %}">
+                        RISK: {{ cam.risk_level }} ({{ cam.risk_score }})
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Threat Matrix & Real-time Charts -->
+<div class="row g-4">
+    <!-- Active Alerts Ticker / Dispatch List -->
+    <div class="col-lg-7">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-bell text-danger"></i> Active Incident & Alert Dispatch
+                </h3>
+                <a href="{{ url_for('alerts.threats_view') }}" class="btn btn-outline-secondary btn-sm" style="font-size: 0.75rem;">
+                    View All Threats <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>EVENT ID</th>
+                            <th>CAMERA</th>
+                            <th>INCIDENT TYPE</th>
+                            <th>RISK SCORE</th>
+                            <th>STATUS</th>
+                            <th>ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-alerts-body">
+                        {% for alert in alerts %}
+                        <tr id="alert-row-{{ alert.event_id }}">
+                            <td class="font-monospace text-cyan fw-bold">{{ alert.event_id }}</td>
+                            <td>
+                                <span class="badge bg-secondary font-monospace">{{ alert.camera_id }}</span>
+                                <div style="font-size: 0.72rem; color: var(--text-dim);">{{ alert.camera_name }}</div>
+                            </td>
+                            <td>
+                                <div class="fw-bold {% if alert.severity == 'CRITICAL' %}text-danger{% elif alert.severity == 'HIGH' %}text-warning{% else %}text-info{% endif %}">
+                                    {{ alert.event_type.replace('_', ' ') }}
+                                </div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">{{ alert.description }}</div>
+                            </td>
+                            <td>
+                                <span class="badge {% if alert.severity == 'CRITICAL' %}badge-critical{% elif alert.severity == 'HIGH' %}badge-high{% elif alert.severity == 'MEDIUM' %}badge-medium{% else %}badge-low{% endif %}">
+                                    {{ alert.risk_score }}/100
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {% if alert.status == 'NEW' %}bg-danger{% elif alert.status == 'ACKNOWLEDGED' %}bg-warning text-dark{% else %}bg-success{% endif %}" id="status-badge-{{ alert.event_id }}">
+                                    {{ alert.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    {% if alert.status == 'NEW' %}
+                                    <button class="btn btn-warning-control" onclick="ackAlert('{{ alert.event_id }}')" title="Acknowledge">
+                                        <i class="fa-solid fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button class="btn btn-success-control" onclick="resolveAlert('{{ alert.event_id }}')" title="Resolve">
+                                        <i class="fa-solid fa-circle-check"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Analytics & Threat Distribution -->
+    <div class="col-lg-5">
+        <div class="security-card h-100">
+            <div class="security-card-header">
+                <h3 class="card-title-hud">
+                    <i class="fa-solid fa-chart-pie text-cyan"></i> Threat & Crowd Distribution
+                </h3>
+                <span class="badge bg-dark border border-secondary text-muted" style="font-size: 0.7rem;">CHART.JS LIVE</span>
+            </div>
+
+            <div class="mb-4">
+                <div class="text-muted mb-2" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">
+                    Hourly Crowd Flow Trend (All Cameras)
+                </div>
+                <div style="height: 160px;">
+                    <canvas id="crowdFlowChart"></canvas>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-muted mb-2" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700;">
+                    AI Threat Vector Breakdown
+                </div>
+                <div style="height: 140px;">
+                    <canvas id="threatPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
